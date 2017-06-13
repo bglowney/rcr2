@@ -1,0 +1,6 @@
+target
+*/target
+*/**/target
+.iml
+.idea
+db/dynamodb/*

@@ -1,0 +1,4 @@
+#!/bin/sh
+
+mvn -f ./cells/ -q exec:exec
+

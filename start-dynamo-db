@@ -1,0 +1,3 @@
+#!/bin/bash
+
+mvn -f db/pom.xml initialize -P start-dynamodb-local
