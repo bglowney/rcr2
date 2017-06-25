@@ -5,18 +5,16 @@ import org.antlr.v4.runtime.misc.NotNull;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
-public class StatementListener<F extends Frame<F>> implements Rcr2Listener {
+public class StatementListener<F extends Frame<F>, C extends Context<F,C>> implements Rcr2Listener {
 
-    private final Context<F> context;
-    private final SessionInput<F> sessionInput;
+    private final SessionInput<F,C> sessionInput;
     private int expressionLevel = 0;
 
-    public StatementListener(Context<F> context, WorkingMemory<F> workingMemory) {
-        this.context = context;
-        this.sessionInput = new SessionInput<>(context, workingMemory);
+    public StatementListener(Session<F,C> session) {
+        this.sessionInput = new SessionInput<>(session);
     }
 
-    public SessionInput<F> getSessionInput() {
+    public SessionInput<F,C> getSessionInput() {
         return sessionInput;
     }
 

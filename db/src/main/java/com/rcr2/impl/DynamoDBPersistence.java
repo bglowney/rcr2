@@ -1,6 +1,7 @@
 package com.rcr2.impl;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
+import com.rcr2.Context;
 import com.rcr2.Frame;
 import com.rcr2.Persistence;
 import lombok.*;
@@ -8,7 +9,7 @@ import lombok.*;
 import java.util.Collection;
 
 @AllArgsConstructor
-public class DynamoDBPersistence<F extends Frame<F>> extends AbstractPersistence<F> {
+public class DynamoDBPersistence<F extends Frame<F>, C extends Context<F,C>> extends AbstractPersistence<F,C> {
 
     final DynamoDBMapper dynamoDB;
 

@@ -1,5 +1,8 @@
 package com.rcr2;
 
+import com.rcr2.impl.InMemoryPersistence;
+import com.rcr2.impl.InMemorySequenceProvider;
+import lombok.val;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -7,32 +10,39 @@ import java.util.Optional;
 
 public class ScriptTest {
 
-    WorkingMemory<TestFrame> workingMemory;
-    Context<TestFrame> context;
+    Session<TestFrame,TestContext> session;
+    TestContext context;
 
     @Before
     public void setup() {
-        context = new Context<TestFrame>()
-                .withPureFunction("e", 0, args -> Optional.of(new TestFrame()))
-                .withPureFunction("f", 2, args -> Optional.of(new TestFrame()))
-                .withPureFunction("g", 2, args -> Optional.empty())
-                .withPureFunction("h", 1, args -> Optional.of(new TestFrame()));
+        context = new TestContext(new InMemorySequenceProvider<>());
+        context.withPureFunction("e", 0, args -> Optional.of(new TestFrame()));
+        context.withPureFunction("f", 2, args -> Optional.of(new TestFrame()));
+        context.withPureFunction("g", 2, args -> Optional.empty());
+        context.withPureFunction("h", 1, args -> Optional.of(new TestFrame()));
 
-        workingMemory = new WorkingMemory<>(context, new TestFrame());
-        SessionInput<TestFrame> x = new SessionInput<>(context, workingMemory);
+        session = new Session<>(
+                new TestFrame(),
+                new TestFeedback(),
+                context,
+                new InMemoryPersistence<>(),
+                TestFrame::new
+        );
+
+        val x = new SessionInput<TestFrame,TestContext>(session);
         x.setAlias("x");
         x.setFunction("e");
-        workingMemory.addStep(x, new TestFrame());
-        SessionInput<TestFrame> y = new SessionInput<>(context, workingMemory);
+        session.addStep(x, new TestFrame(), false);
+        val y = new SessionInput<TestFrame,TestContext>(session);
         y.setAlias("y");
         y.setFunction("e");
-        workingMemory.addStep(y, new TestFrame());
+        session.addStep(y, new TestFrame(), false);
 
     }
 
     @Test
     public void testGoodScript() {
-        SessionInput sessionInput = new Script().processStatement(context, workingMemory,"a = f x y;");
+        SessionInput sessionInput = new Script().processStatement(session,"a = f x y;");
 
         assert sessionInput.getAlias().isPresent();
         assert "a".equals(sessionInput.getAlias().get());
@@ -44,7 +54,7 @@ public class ScriptTest {
      */
     @Test(expected = ScriptParseException.class)
     public void testUndefinedFunctionScript() {
-        SessionInput sessionInput = new Script().processStatement(context, workingMemory,"c = h x y;");
+        SessionInput sessionInput = new Script().processStatement(session,"c = h x y;");
     }
 
     /**
@@ -52,7 +62,7 @@ public class ScriptTest {
      */
     @Test(expected = ScriptParseException.class)
     public void testBadPureFunctionScript() {
-        SessionInput sessionInput = new Script().processStatement(context, workingMemory,"f x y;");
+        SessionInput sessionInput = new Script().processStatement(session,"f x y;");
     }
 
     /**
@@ -60,7 +70,7 @@ public class ScriptTest {
      */
     @Test(expected = ScriptParseException.class)
     public void testBadReferenceScript() {
-        SessionInput sessionInput = new Script().processStatement(context, workingMemory,"b = g x z;");
+        SessionInput sessionInput = new Script().processStatement(session,"b = g x z;");
     }
 
     /**
@@ -68,13 +78,13 @@ public class ScriptTest {
      */
     @Test(expected = ScriptParseException.class)
     public void testInvalidArguments() {
-        SessionInput sessionInput = new Script().processStatement(context, workingMemory,"b = f x;");
+        SessionInput sessionInput = new Script().processStatement(session,"b = f x;");
     }
 
     @Test
     public void testParseNestedArgs() {
         SessionInput sessionInput = new Script()
-                .processStatement(context, workingMemory, "a = h (text);");
+                .processStatement(session, "a = h (text);");
 
         assert sessionInput.getAlias().isPresent();
         assert "a".equals(sessionInput.getAlias().get());
@@ -85,10 +95,10 @@ public class ScriptTest {
     @Test
     public void testParseSingleNestedExpression() {
         // add the expected dependencies to working memory
-        workingMemory.addStep(new Script().processStatement(context, workingMemory, "b = h text;"), new TestFrame());
+        session.addStep(new Script().processStatement(session, "b = h text;"), new TestFrame(), false);
 
         SessionInput sessionInput = new Script()
-                .processStatement(context, workingMemory, "a = h (h (text));");
+                .processStatement(session, "a = h (h (text));");
 
         assert sessionInput.getAlias().isPresent();
         assert "a".equals(sessionInput.getAlias().get());
@@ -99,11 +109,11 @@ public class ScriptTest {
     @Test
     public void testParseMultipleNestedExpression() {
         // add the expected dependencies to working memory
-        workingMemory.addStep(new Script().processStatement(context, workingMemory, "b = h text;"), new TestFrame());
-        workingMemory.addStep(new Script().processStatement(context, workingMemory, "c = f text text;"), new TestFrame());
+        session.addStep(new Script().processStatement(session, "b = h text;"), new TestFrame(), false);
+        session.addStep(new Script().processStatement(session, "c = f text text;"), new TestFrame(), false);
 
         SessionInput sessionInput = new Script()
-                .processStatement(context, workingMemory, "a = h (h (text), f (text, text));");
+                .processStatement(session, "a = h (h (text), f (text, text));");
 
         assert sessionInput.getAlias().isPresent();
         assert "a".equals(sessionInput.getAlias().get());

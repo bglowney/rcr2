@@ -1,15 +1,12 @@
 package com.rcr2.impl;
 
-import com.rcr2.Frame;
-import com.rcr2.Persistence;
-import com.rcr2.SessionInput;
-import com.rcr2.WorkingMemory;
+import com.rcr2.*;
 import lombok.val;
 
 import java.util.Collection;
 import java.util.Comparator;
 
-public abstract class AbstractPersistence<F extends Frame<F>> implements Persistence<F> {
+public abstract class AbstractPersistence<F extends Frame<F>, C extends Context<F,C>> implements Persistence<F,C> {
 
     public abstract Collection<? extends FeedbackStats> getFeedbackStats(String currentState);
 
@@ -31,29 +28,32 @@ public abstract class AbstractPersistence<F extends Frame<F>> implements Persist
     }
 
     @Override
-    public void update(WorkingMemory<F> workingMemory, int score) {
-        update(workingMemory, null, score);
+    public void update(Session<F,C> sessoin, int score) {
+        update(sessoin, null, score);
     }
 
     @Override
-    public void update(WorkingMemory<F> workingMemory, SessionInput<F> sideEffectInput, int score) {
-        String previousDependencies = WorkingMemory.DEFAULT_STATE_SERIALIZATION;
-        for (val alias : workingMemory.getEntriesByAlias().keySet()) {
+    public void update(Session<F,C> session, SessionInput<F,C> sideEffectInput, int score) {
+        String previousDependencies = Session.DEFAULT_STATE_SERIALIZATION;
+        for (val alias : session.getEntriesByAlias().keySet()) {
             // only update the most recent entries
-            if (!workingMemory.inScope(alias))
-                continue;
+            if (!session.inScope(alias)) continue;
 
-            val entry = workingMemory.getEntriesByAlias().get(alias);
+            val entry = session.getEntriesByAlias().get(alias);
+
+            // if is substep in a sequence we don't record feedback
+            if (entry.isInSequence()) continue;
+
             // candidate is the script for the next best action
             val candidate = entry.getSessionInput().serializeStatement();
             addObservation(previousDependencies, candidate, score);
             for (val failure: entry.getFailures())
                 addObservation(previousDependencies, failure.getFailedInput().serializeStatement(), failure.getFeedback());
 
-            previousDependencies = workingMemory.serializePrevious(alias);
+            previousDependencies = session.serializePrevious(alias);
 
             // if this is the last step add the sideEffectInput's score, too
-            if (sideEffectInput != null && entry.getStep() == workingMemory.getCurrentStep() - 1) {
+            if (sideEffectInput != null && entry.getStep() == session.getCurrentStep() - 1) {
                 addObservation(previousDependencies,
                         sideEffectInput.serializeStatement(),
                         score);

@@ -1,34 +1,27 @@
 package com.rcr2.cells;
 
-import com.google.inject.Guice;
-import com.google.inject.Inject;
-import com.google.inject.Injector;
+import com.rcr2.FrameProvider;
 import com.rcr2.Persistence;
 import com.rcr2.cells.CellFrame.Animate;
 import com.rcr2.cells.CellFrame.Inanimate;
 import com.rcr2.cells.CellFrame.Player;
-import com.rcr2.cells.Functions.Place;
+import com.rcr2.cells.CellsContext.Place;
 import com.rcr2.impl.CliSession;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
-public class CellSession extends CliSession<CellFrame,Functions.CellsContext> {
+public class CellSession extends CliSession<CellFrame,CellsContext> {
 
-    public static void main(String[] args) {
-        Injector injector = Guice.createInjector(new CellsModule());
-        CellSession session = injector.getInstance(CellSession.class);
-        session.start();
-    }
-
-    @Inject
-    public CellSession(Persistence<CellFrame> persistence) {
-        super(persistence,
-              Functions.newContext(),
-              null);
-        this.currentFrame = new CellFrame(this.context.mainCell);
-        this.workingMemory.setText(this.currentFrame);
+    public CellSession(Persistence<CellFrame,CellsContext> persistence, CellsContext cellsContext, FrameProvider<CellFrame> frameProvider) {
+        super(
+            persistence,
+            cellsContext,
+            new CellFrame(cellsContext.mainCell),
+            frameProvider
+        );
+        this.setText(this.currentFrame);
     }
 
     @Override
@@ -112,6 +105,6 @@ public class CellSession extends CliSession<CellFrame,Functions.CellsContext> {
     @Override
     protected String displayDebug() {
         return CellFrame.displayCell(context.mainCell) + "\n"
-               + Functions.CellsContext.displayCells(context.places);
+               + CellsContext.displayCells(context.places);
     }
 }

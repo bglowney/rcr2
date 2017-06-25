@@ -1,12 +1,12 @@
 package com.rcr2;
 
-public interface Persistence<F extends Frame<F>> {
+public interface Persistence<F extends Frame<F>, C extends Context<F,C>> {
 
     String bestFor(String currentState, int minObservations);
 
-    void update(WorkingMemory<F> workingMemory, int score);
+    void update(Session<F,C> workingMemory, int score);
 
-    void update(WorkingMemory<F> workingMemory, SessionInput<F> sideEffectInput, int score);
+    void update(Session<F,C> workingMemory, SessionInput<F,C> sideEffectInput, int score);
 
     interface FeedbackStats extends Comparable<FeedbackStats> {
         Integer getCount();

@@ -8,33 +8,33 @@ import org.junit.Test;
 
 import java.util.*;
 
-import static com.rcr2.WorkingMemory.DEFAULT_STATE_SERIALIZATION;
+import static com.rcr2.Session.DEFAULT_STATE_SERIALIZATION;
 
 public class PersistenceTest {
 
     Script script;
-    Context<TestFrame> context;
-    InMemoryPersistence<TestFrame> persistence;
+    TestContext context;
+    InMemoryPersistence<TestFrame,TestContext> persistence;
 
     @Before
     public void setup() {
         script = new Script();
-        context = new Context<TestFrame>()
-                .withPureFunction("f", 1, args -> Optional.of(new TestFrame()))
-                .withPureFunction("g", 1, args -> Optional.of(new TestFrame()))
-                .withPureFunction("h", 2, args -> Optional.of(new TestFrame()));
+        context = new TestContext(new InMemorySequenceProvider<>());
+        context.withPureFunction("f", 1, args -> Optional.of(new TestFrame()));
+        context.withPureFunction("g", 1, args -> Optional.of(new TestFrame()));
+        context.withPureFunction("h", 2, args -> Optional.of(new TestFrame()));
         persistence = new InMemoryPersistence<>();
     }
 
     @Test
     public void testInMemoryPersistence() {
-        WorkingMemory<TestFrame> workingMemory = new WorkingMemory<>(context, new TestFrame());
-        SessionInput<TestFrame> input1 = script.processStatement(context, workingMemory, "a = f text;");
-        workingMemory.addStep(input1, new TestFrame());
-        SessionInput<TestFrame> input2 = script.processStatement(context, workingMemory,"b = f a;");
-        workingMemory.addStep(input2, new TestFrame());
+        Session<TestFrame,TestContext> session = new TestSession(context);
+        val input1 = script.processStatement(session, "a = f text;");
+        session.addStep(input1, new TestFrame(), false);
+        val input2 = script.processStatement(session,"b = f a;");
+        session.addStep(input2, new TestFrame(), false);
 
-        persistence.update(workingMemory, 1);
+        persistence.update(session, 1);
 
         Map<String,Persistence.FeedbackStats> m = persistence.data.get(DEFAULT_STATE_SERIALIZATION);
         assert m != null;
@@ -43,7 +43,7 @@ public class PersistenceTest {
         assert stats.getCount() == 1;
         assert ((FeedbackStats) stats).cumulative == 1;
 
-        m = persistence.data.get(workingMemory.serializePrevious(input1.getAlias().get()));
+        m = persistence.data.get(session.serializePrevious(input1.getAlias().get()));
         assert m != null;
         stats = m.get(input2.serializeStatement());
         assert stats != null;
@@ -51,11 +51,11 @@ public class PersistenceTest {
         assert ((FeedbackStats) stats).cumulative == 1;
 
         // simulate case that input1 and input 2 were applied again in a new session
-        workingMemory = new WorkingMemory<>(context, new TestFrame());
-        workingMemory.addStep(input1, new TestFrame());
-        workingMemory.addStep(input2, new TestFrame());
+        session = new TestSession(context);
+        session.addStep(input1, new TestFrame(), false);
+        session.addStep(input2, new TestFrame(), false);
 
-        persistence.update(workingMemory, 1);
+        persistence.update(session, 1);
 
         m = persistence.data.get(DEFAULT_STATE_SERIALIZATION);
         assert m != null;
@@ -64,7 +64,7 @@ public class PersistenceTest {
         assert stats.getCount() == 2;
         assert ((FeedbackStats) stats).cumulative == 2;
 
-        m = persistence.data.get(workingMemory.serializePrevious(input1.getAlias().get()));
+        m = persistence.data.get(session.serializePrevious(input1.getAlias().get()));
         assert m != null;
         stats = m.get(input2.serializeStatement());
         assert stats != null;
@@ -74,13 +74,13 @@ public class PersistenceTest {
 
     @Test
     public void testBestFor() {
-        WorkingMemory<TestFrame> workingMemory = new WorkingMemory<>(context, new TestFrame());
-        workingMemory.addStep(script.processStatement(context, workingMemory, "a = f text;"), new TestFrame());
-        persistence.update(workingMemory, 1);
+        Session<TestFrame,TestContext> session = new TestSession(context);
+        session.addStep(script.processStatement(session, "a = f text;"), new TestFrame(), false);
+        persistence.update(session, 1);
 
-        workingMemory = new WorkingMemory<>(context, new TestFrame());
-        workingMemory.addStep(script.processStatement(context, workingMemory, "a = f text;"), new TestFrame());
-        persistence.update(workingMemory, 1);
+        session = new TestSession(context);
+        session.addStep(script.processStatement(session, "a = f text;"), new TestFrame(),false);
+        persistence.update(session, 1);
 
         String dependencies = "text";
 
@@ -89,13 +89,13 @@ public class PersistenceTest {
         // with 3 minimum observations we should not have any reliable best
         assert bestScript == null;
 
-        workingMemory = new WorkingMemory<>(context, new TestFrame());
-        workingMemory.addStep(script.processStatement(context, workingMemory, "a = g text;"), new TestFrame());
-        persistence.update(workingMemory, 1);
+        session = new TestSession(context);
+        session.addStep(script.processStatement(session, "a = g text;"), new TestFrame(), false);
+        persistence.update(session, 1);
 
-        workingMemory = new WorkingMemory<>(context, new TestFrame());
-        workingMemory.addStep(script.processStatement(context, workingMemory, "a = g text;"), new TestFrame());
-        persistence.update(workingMemory, 2);
+        session = new TestSession(context);
+        session.addStep(script.processStatement(session, "a = g text;"), new TestFrame(), false);
+        persistence.update(session, 2);
 
         // we have applied f and g to text twice respectively
         // because cumulative feedback for g was greater, we would expect the best
@@ -104,8 +104,8 @@ public class PersistenceTest {
 
         assert bestScript.equals("g (text)");
 
-        workingMemory.addStep(script.processStatement(context, workingMemory, "b = " + bestScript + ";") , new TestFrame());
-        SessionInput sessionInput = workingMemory.getInput("b");
+        session.addStep(script.processStatement(session, "b = " + bestScript + ";") , new TestFrame(),false);
+        SessionInput sessionInput = session.getInput("b");
 
         assert sessionInput != null;
 

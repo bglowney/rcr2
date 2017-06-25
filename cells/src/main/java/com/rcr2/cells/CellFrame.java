@@ -1,6 +1,7 @@
 package com.rcr2.cells;
 
 import com.rcr2.impl.DisplayableFrame;
+import lombok.val;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,6 +26,12 @@ public class CellFrame implements DisplayableFrame<CellFrame> {
         }
     }
 
+    @Override
+    public void wrap(List<CellFrame> others) {
+        for (val frame : others)
+            this.cells.addAll(frame.getCells());
+    }
+
     private final Cell mainCell;
 
     CellFrame() {
@@ -43,7 +50,7 @@ public class CellFrame implements DisplayableFrame<CellFrame> {
         String display = "";
         if (mainCell != null)
             display = displayCell(mainCell);
-        return display + "\n" + Functions.CellsContext.displayCells(cells);
+        return display + "\n" + CellsContext.displayCells(cells);
     }
 
     public static String displayCell(Cell cell) {

@@ -7,7 +7,7 @@ import java.util.Scanner;
 
 import static java.lang.System.out;
 
-public abstract class CliSession<F extends DisplayableFrame<F>, C extends Context<F>> extends Session<F,C> {
+public abstract class CliSession<F extends DisplayableFrame<F>, C extends Context<F,C>> extends Session<F,C> {
 
     private static final String QUIT_CMD = ":quit";
     private static final String HELP_CMD = ":help";
@@ -15,7 +15,7 @@ public abstract class CliSession<F extends DisplayableFrame<F>, C extends Contex
     private static final String DEBUG_CMD = ":debug";
     private static final String MEMORY_CMD = ":memory";
     private static final String IMITATE_CMD = ":imitate";
-    private Scanner scanner;
+    private final Scanner scanner;
 
     public void start() {
         out.print("\033[H\033[2J");
@@ -38,7 +38,7 @@ public abstract class CliSession<F extends DisplayableFrame<F>, C extends Contex
                         out.println(":display requires an argument");
                     else {
                         String arg = words[1];
-                        DisplayableFrame<F> frame = workingMemory.getFrame(arg);
+                        DisplayableFrame<F> frame = this.getFrame(arg);
                         if (frame == null)
                             out.println(String.format("Unrecognized argument %s", arg));
                         else
@@ -46,7 +46,7 @@ public abstract class CliSession<F extends DisplayableFrame<F>, C extends Contex
                     }
                     break;
                 case MEMORY_CMD:
-                    out.println(workingMemory.display());
+                    out.println(this.display());
                     break;
                 case DEBUG_CMD:
                     out.println(displayDebug());
@@ -90,49 +90,57 @@ public abstract class CliSession<F extends DisplayableFrame<F>, C extends Contex
                 "\t" + HELP_CMD + "\tPrint this message\n";
     }
 
-    public CliSession(@NotNull Persistence<F> persistence, @NotNull C context, @NotNull F initFrame) {
-        this.persistence = persistence;
-        this.context = context;
-        this.workingMemory = new WorkingMemory<>(context, initFrame);
+    public CliSession(@NotNull Persistence<F,C> persistence,
+                      @NotNull C context,
+                      @NotNull F initFrame,
+                      @NotNull FrameProvider<F> frameProvider) {
+        super(
+            initFrame,
+            new Feedback<F>() {
+
+                private final Scanner scanner = new Scanner(System.in);
+
+                @Override
+                public int score(F previous, F currentFrame) {
+                    out.println("Side effect successful. Getting feedback.");
+                    out.println("Previous: \n" + previous.display());
+                    out.println("Current: \n" + currentFrame.display());
+                    out.println("Enter score?");
+                    String scoreString = null;
+                    Integer score = null;
+                    while (score == null) {
+                        scoreString = scanner.nextLine();
+                        try {
+                            score = Integer.parseInt(scoreString);
+                        } catch (NumberFormatException e) {
+                            out.println("Please enter an integer");
+                        }
+                    }
+                    return score;
+                }
+
+                @Override
+                public int failed() {
+                    out.println("Side effect failed. Getting feedback.");
+                    String scoreString = null;
+                    Integer score = null;
+                    while (score == null) {
+                        scoreString = scanner.nextLine();
+                        try {
+                            score = Integer.parseInt(scoreString);
+                        } catch (NumberFormatException e) {
+                            out.println("Please enter an integer");
+                        }
+                    }
+                    return score;
+                }
+            },
+            context,
+            persistence,
+            frameProvider
+        );
         this.currentFrame = initFrame;
         scanner = new Scanner(System.in);
-
-        this.feedback = new Feedback<F>() {
-            @Override
-            public int score(F previous, F currentFrame) {
-                out.println("Side effect successful. Getting feedback.");
-                out.println("Previous: \n" + previous.display());
-                out.println("Current: \n" + currentFrame.display());
-                out.println("Enter score?");
-                String scoreString = null;
-                Integer score = null;
-                while (score == null) {
-                    scoreString = scanner.nextLine();
-                    try {
-                        score = Integer.parseInt(scoreString);
-                    } catch (NumberFormatException e) {
-                        out.println("Please enter an integer");
-                    }
-                }
-                return score;
-            }
-
-            @Override
-            public int failed() {
-                out.println("Side effect failed. Getting feedback.");
-                String scoreString = null;
-                Integer score = null;
-                while (score == null) {
-                    scoreString = scanner.nextLine();
-                    try {
-                        score = Integer.parseInt(scoreString);
-                    } catch (NumberFormatException e) {
-                        out.println("Please enter an integer");
-                    }
-                }
-                return score;
-            }
-        };
 
     }
 }

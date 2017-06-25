@@ -124,8 +124,7 @@ about the relationship between different objects, and from these relationships
 assert the presence of other objects. The goal is to develop a logic for recognition
 imitating human understanding of salient patterns.
 
-This opens up the idea of atoms in Rcr2. Unlike atoms in other logic oriented languages,
-atoms here are stochastic. Here's an example.
+This opens up the idea of names in Rcr2. Here's an example.
 
 ```
 # find a "face" in the image 
@@ -135,22 +134,32 @@ oc = outmost c;
 ic = inside oc c;
 u = curves p;
 ui = inside oc u;
-m =  below ic ui;
+m = below ic ui;
 # assert that there is a face if  
 # m and ic are truthy 
-atom face m ic;
+:call face m ic;
+
+# call the two circles "eyes"
+:call eyes ic;
 ```
 
-We now have at least one definition for the atom `face`. There could be other definitions
+We now have at least one definition for the name `face`. There could be other definitions
 though. How do we resolve a single "best" definition?
 
-The answer is through feedback. When in a session an imitated makes a call for an atom,
-we actually will run the statements the atom depends on.
+The answer is through feedback. When in a session an imitated makes a call for an name,
+we actually will run the statements the name depends on.
 
 ```
-f = face text;
+f = face;
 ```
 
-Any subsequent statements depending on `f` may now fail, and their feedback will be applied
-to f. Similarly, a side effect may succeed and its feedback will be applied to f. In this way
-the actual definition called is the _current best_ definition, but it may change in the future. 
+Now there are two classes of results
+
+1. the assignment fails because one of the statements required to "create f" fails. In this case
+ the failure does not provide feedback to how good of a definition the procedure is for `face` but 
+ rather just to how good of a choice it is to call `face` after the previous statement.
+ 
+2. the assignment is successful. Now, any subsequent statements depending on `f` may fail,
+ and _this_ feedback will be applied to f. Similarly, a side effect may succeed and its feedback 
+ will be applied to f. In this way the actual definition called is the _current best_ definition,
+ but it may change in the future. 

@@ -6,12 +6,12 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.model.*;
 import com.amazonaws.services.dynamodbv2.util.TableUtils;
-import com.google.inject.AbstractModule;
-import com.google.inject.Inject;
-import com.google.inject.Provides;
-import com.google.inject.Singleton;
+import com.google.inject.*;
+import com.rcr2.FrameProvider;
 import com.rcr2.Persistence;
+import com.rcr2.SequenceProvider;
 import com.rcr2.impl.DynamoDBPersistence;
+import com.rcr2.impl.InMemorySequenceProvider;
 import lombok.val;
 
 import static com.rcr2.impl.DynamoDBPersistence.FEEDBACK_STATS_TABLE;
@@ -19,6 +19,12 @@ import static com.rcr2.impl.DynamoDBPersistence.PRIOR_STATEMENT_KEY;
 import static com.rcr2.impl.DynamoDBPersistence.SUBSEQUENT_STATEMENT_KEY;
 
 public class CellsModule extends AbstractModule {
+
+    public static void main(String[] args) {
+        val injector = Guice.createInjector(new CellsModule());
+        val session = injector.getInstance(CellSession.class);
+        session.start();
+    }
 
     @Override
     protected void configure() {
@@ -49,15 +55,50 @@ public class CellsModule extends AbstractModule {
 
     @Provides
     @Singleton
+    SequenceProvider<CellFrame,CellsContext> sequenceProvider() {
+        return new InMemorySequenceProvider<>();
+    }
+
+    @Provides
+    @Singleton
+    CellFrame.Player mainCell() {
+        return new CellFrame.Player(5,5);
+    }
+
+    @Provides
+    @Singleton
     @Inject
-    Persistence<CellFrame> persistence(AmazonDynamoDB dynamoDB) {
+    CellsContext context(SequenceProvider<CellFrame,CellsContext> sequenceProvider, CellFrame.Player mainCell) {
+        val context = new CellsContext(
+            sequenceProvider,
+            mainCell,
+            CellsContext.CELLS_LENGTH,
+            CellsContext.CELLS_WIDTH
+        );
+
+        Functions.setContextFunctions(context);
+
+        return context;
+    }
+
+    @Provides
+    @Singleton
+    @Inject
+    FrameProvider<CellFrame> frameProvider(CellFrame.Player mainCell) {
+        return () -> new CellFrame(mainCell);
+    }
+
+    @Provides
+    @Singleton
+    @Inject
+    Persistence<CellFrame,CellsContext> persistence(AmazonDynamoDB dynamoDB) {
         return new DynamoDBPersistence<>(new DynamoDBMapper(dynamoDB));
     }
 
     @Provides
     @Singleton
     @Inject
-    CellSession session(Persistence<CellFrame> persistence) {
-        return new CellSession(persistence);
+    CellSession context(Persistence<CellFrame,CellsContext> persistence, CellsContext cellsContext, FrameProvider<CellFrame> frameProvider) {
+        return new CellSession(persistence, cellsContext, frameProvider);
     }
 }

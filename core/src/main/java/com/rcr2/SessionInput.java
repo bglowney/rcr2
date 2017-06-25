@@ -2,13 +2,12 @@ package com.rcr2;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.antlr.v4.runtime.misc.NotNull;
 
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class SessionInput<F extends Frame<F>> {
+public class SessionInput<F extends Frame<F>, C extends Context<F,C>> {
 
     @Getter @Setter
     private String function;
@@ -18,14 +17,14 @@ public class SessionInput<F extends Frame<F>> {
     protected String alias;
     protected Optional<F> result;
 
-    protected final Context<F> context;
-    protected final WorkingMemory<F> workingMemory;
+    protected final Session<F,C> session;
+    protected final Context<F,C> context;
 
     private String serialization;
 
-    public SessionInput(@NotNull Context<F> context, @NotNull WorkingMemory<F> workingMemory) {
-        this.context = context;
-        this.workingMemory = workingMemory;
+    public SessionInput(Session<F,C> session) {
+        this.session = session;
+        this.context = session.context;
     }
 
     public void init() {
@@ -36,8 +35,8 @@ public class SessionInput<F extends Frame<F>> {
         args.add(arg);
     }
 
-    public boolean hasSideEffect(Context<F> context) {
-        return context.functionForName(function) instanceof Function.SideEffect;
+    public boolean hasSideEffect(Context<F,C> context) {
+        return !context.isPureFunction(function);
     }
 
     /**
@@ -45,15 +44,15 @@ public class SessionInput<F extends Frame<F>> {
      * and concatenate with the args of all children
      */
     public SortedSet<String> dependsOn() {
-        return Stream.concat(args.stream().map(arg -> workingMemory.getInput(arg).serializeStatement()),
-                      args.stream().flatMap(arg -> workingMemory.getInput(arg).dependsOn().stream()))
+        return Stream.concat(args.stream().map(arg -> session.getInput(arg).serializeStatement()),
+                      args.stream().flatMap(arg -> session.getInput(arg).dependsOn().stream()))
                 .sorted(Comparator.naturalOrder())
                 .collect(Collectors.toCollection(TreeSet::new));
     }
 
-    public Optional<F> apply() {
+    public Optional<F> apply(Session<F,C> session, F baseFrame) {
         if (this.result == null)
-            this.result = context.functionForName(function).apply(getArgFrames(workingMemory));
+            this.result = context.functionForName(function, session, baseFrame).apply(getArgFrames());
         return this.result;
     }
 
@@ -68,7 +67,7 @@ public class SessionInput<F extends Frame<F>> {
             return this.serialization;
 
         if (this.result == null)
-            this.result = this.apply();
+            this.result = this.apply(session, session.frameProvider.newFrame());
 
         final String annotation = result
                 .map(f -> f instanceof EmptyFrame ? Frame.EMPTY_ANNOTATION : "")
@@ -76,16 +75,16 @@ public class SessionInput<F extends Frame<F>> {
 
         return annotation + this.function + " (" +
             args.stream()
-            .map(arg -> workingMemory.getInput(arg))
+            .map(arg -> session.getInput(arg))
             .map(arg -> arg.serializeStatement())
             .collect(Collectors.joining(", "))
             + ")";
     }
 
-    public List<F> getArgFrames(WorkingMemory<F> workingMemory) {
+    public List<F> getArgFrames() {
         return args.stream()
             .map(arg -> {
-                F frame = workingMemory.getFrame(arg);
+                F frame = session.getFrame(arg);
                 if (frame == null)
                     throw new ScriptParseException(String.format("Unrecognized symbol `%s'", arg));
                 return frame;

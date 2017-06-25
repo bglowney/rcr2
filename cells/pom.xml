@@ -60,7 +60,7 @@
                         <classpath/>
                         <!-- allow debugging on port 5005 -->
                         <argument>-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005</argument>
-                        <argument>com.rcr2.cells.CellSession</argument>
+                        <argument>com.rcr2.cells.CellsModule</argument>
                     </arguments>
                 </configuration>
             </plugin>

@@ -1,10 +1,13 @@
 package com.rcr2;
 
+import java.util.List;
+
 public interface Frame<F extends Frame<F>> {
 
-    public static final String EMPTY_ANNOTATION = "~";
-    public static final String FAILED_ANNOTATION = "!";
+    String EMPTY_ANNOTATION = "~";
+    String FAILED_ANNOTATION = "!";
 
-    public F copy();
+    F copy();
+    void wrap(List<F> others);
 
 }

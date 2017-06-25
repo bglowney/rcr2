@@ -1,5 +1,6 @@
 package com.rcr2.impl;
 
+import com.rcr2.Context;
 import com.rcr2.Frame;
 import com.rcr2.Persistence;
 import lombok.Getter;
@@ -8,7 +9,7 @@ import lombok.val;
 
 import java.util.*;
 
-public class InMemoryPersistence<F extends Frame<F>> extends AbstractPersistence<F> {
+public class InMemoryPersistence<F extends Frame<F>, C extends Context<F,C>> extends AbstractPersistence<F,C> {
 
     @RequiredArgsConstructor
     static class FeedbackStats implements Persistence.FeedbackStats {
